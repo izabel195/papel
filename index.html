@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Controle de Estoque - Aero Pipa</title>
+
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: url("./Cópia-de-layout-site-aero.png") no-repeat center center fixed;
+      background-size: cover;
+      color: #000000;
+      display: none;
+    }
+    h1 {
+      text-align: center;
+      color: #fafafa;
+      text-shadow: 2px 2px 4px #464646;
+    }
+    .card {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 20px;
+      margin: 20px auto;
+      border-radius: 12px;
+      max-width: 800px;
+      color: white;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      color: #000000;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      color: black;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+      background-color: #fff;
+    }
+    th {
+      background: #007BFF;
+      color: white;
+    }
+    #logoutBtn {
+      float: right;
+      background: red;
+      margin-right: 10px;
+    }
+    #loginContainer {
+      max-width: 400px;
+      margin: 50px auto;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 30px;
+      border-radius: 10px;
+      color: white;
+      display: none;
+    }
+    #loginContainer input {
+      color: black;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Controle de Estoque - Aero Pipa</h1>
+  <button id="logoutBtn" onclick="logout()">Sair</button>
+
+  <div id="appContent">
+    <!-- CADASTRO -->
+    <div class="card">
+      <h2>Cadastro de Produto</h2>
+      <label for="nomeProduto">Nome do Produto:</label>
+      <input type="text" id="nomeProduto" />
+      <label for="categoriaProduto">Categoria:</label>
+      <input type="text" id="categoriaProduto" />
+      <label for="estoqueMinimo">Estoque Mínimo:</label>
+      <input type="number" id="estoqueMinimo" />
+      <button id="btnSalvar" onclick="cadastrarProduto()">Cadastrar Produto</button>
+      <button onclick="mostrarCadastroLista()">Cadastrar em Lote</button>
+      <div id="cadastroLista" style="display:none; margin-top:10px;">
+        <label for="listaProdutos">Lista (Nome, Categoria, Mínimo por linha):</label>
+        <textarea id="listaProdutos" rows="5" style="width:100%;"></textarea>
+        <button onclick="cadastrarLista()">Cadastrar Lista</button>
+      </div>
+    </div>
+
+    <!-- MOVIMENTAÇÃO -->
+    <div class="card">
+      <h2>Movimentar Produto</h2>
+      <label for="produtoSelect">Produto:</label>
+      <select id="produtoSelect"></select>
+      <label for="tipoMov">Tipo:</label>
+      <select id="tipoMov">
+        <option value="Entrada">Entrada</option>
+        <option value="Saída">Saída</option>
+      </select>
+      <label for="quantidade">Quantidade:</label>
+      <input type="number" id="quantidade" />
+      <label for="responsavel">Responsável:</label>
+      <input type="text" id="responsavel" />
+      <button onclick="registrarMovimentacao()">Registrar Movimentação</button>
+    </div>
+
+    <!-- ESTOQUE -->
+    <div class="card">
+      <h2>Estoque Atual</h2>
+      <label for="filtroCategoria">Filtrar por Categoria:</label>
+      <input type="text" id="filtroCategoria" placeholder="Ex: Pipas" oninput="filtrarEstoque()" />
+      <label for="filtroNome">Filtrar por Nome:</label>
+      <input type="text" id="filtroNome" placeholder="Ex: Pipa Azul" oninput="filtrarEstoque()" />
+      <table id="estoqueTable">
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Categoria</th>
+            <th>Estoque</th>
+            <th>Mínimo</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="card">
+      <h2>Histórico de Movimentações</h2>
+      <table id="historicoTable">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Produto</th>
+            <th>Tipo</th>
+            <th>Quantidade</th>
+            <th>Responsável</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginContainer">
+    <h2>Login</h2>
+    <input type="email" id="email" placeholder="Email" /><br /><br />
+    <input type="password" id="senha" placeholder="Senha" /><br /><br />
+    <button onclick="login()">Entrar</button>
+    <button onclick="registrar()">Registrar</button>
+  </div>
+
+  <!-- LÓGICA FIREBASE -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZ_Z_Wftm6spbKVzbTwRjssWdr7szLOEM",
+      authDomain: "aeropipa-eaa28.firebaseapp.com",
+      projectId: "aeropipa-eaa28",
+      storageBucket: "aeropipa-eaa28.appspot.com",
+      messagingSenderId: "782676652165",
+      appId: "1:782676652165:web:a3a0c633f4b29e55c279ec"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    const appContent = document.getElementById('appContent');
+    const loginContainer = document.getElementById('loginContainer');
+    const body = document.body;
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Variável para guardar o id do produto que está sendo editado
+    let produtoEditandoId = null;
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        body.style.display = 'block';
+        appContent.style.display = 'block';
+        loginContainer.style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
+        atualizarProdutos();
+        atualizarEstoque();
+        atualizarHistorico();
+      } else {
+        body.style.display = 'block';
+        appContent.style.display = 'none';
+        loginContainer.style.display = 'block';
+        logoutBtn.style.display = 'none';
+      }
+    });
+
+    function login() {
+      const email = document.getElementById('email').value.trim();
+      const senha = document.getElementById('senha').value.trim();
+      if (!email || !senha) return alert("Preencha email e senha.");
+      auth.signInWithEmailAndPassword(email, senha).catch(e => alert("Erro ao fazer login: " + e.message));
+    }
+
+    function registrar() {
+      const email = document.getElementById('email').value.trim();
+      const senha = document.getElementById('senha').value.trim();
+      if (!email || !senha) return alert("Preencha email e senha para registrar.");
+      auth.createUserWithEmailAndPassword(email, senha).catch(e => alert("Erro ao registrar: " + e.message));
+    }
+
+    function logout() {
+      auth.signOut();
+    }
+
+    async function cadastrarProduto() {
+      const nome = document.getElementById('nomeProduto').value.trim();
+      const categoria = document.getElementById('categoriaProduto').value.trim();
+      const minimo = parseInt(document.getElementById('estoqueMinimo').value);
+      if (!nome || !categoria || isNaN(minimo)) return alert("Preencha todos os campos do produto.");
+
+      try {
+        if (produtoEditandoId) {
+          // Atualiza o produto existente
+          await db.collection("produtos").doc(produtoEditandoId).update({ nome, categoria, minimo });
+          alert("Produto atualizado!");
+          produtoEditandoId = null;
+          document.getElementById('btnSalvar').textContent = "Cadastrar Produto";
+        } else {
+          // Cadastra novo produto
+          await db.collection("produtos").add({ nome, categoria, estoque: 0, minimo });
+          alert("Produto cadastrado!");
+        }
+
+        document.getElementById('nomeProduto').value = '';
+        document.getElementById('categoriaProduto').value = '';
+        document.getElementById('estoqueMinimo').value = '';
+
+        atualizarProdutos();
+        atualizarEstoque();
+      } catch (e) {
+        alert("Erro ao cadastrar/atualizar produto: " + e.message);
+      }
+    }
+
+    function mostrarCadastroLista() {
+      const div = document.getElementById('cadastroLista');
+      div.style.display = div.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function cadastrarLista() {
+      const lista = document.getElementById('listaProdutos').value.trim();
+      if (!lista) return alert("Insira a lista de produtos.");
+      const linhas = lista.split('\n');
+      let cadastrado = 0;
+      for (const linha of linhas) {
+        const partes = linha.split(',');
+        if (partes.length !== 3) continue;
+        const nome = partes[0].trim();
+        const categoria = partes[1].trim();
+        const minimo = parseInt(partes[2].trim());
+        if (!nome || !categoria || isNaN(minimo)) continue;
+        try {
+          await db.collection("produtos").add({ nome, categoria, estoque: 0, minimo });
+          cadastrado++;
+        } catch (e) {
+          console.error("Erro:", e.message);
+        }
+      }
+      alert(`${cadastrado} produto(s) cadastrados!`);
+      document.getElementById('listaProdutos').value = '';
+      atualizarProdutos();
+      atualizarEstoque();
+    }
+
+    async function registrarMovimentacao() {
+      const user = auth.currentUser;
+      const produtoId = document.getElementById('produtoSelect').value;
+      const tipo = document.getElementById('tipoMov').value;
+      const quantidade = parseInt(document.getElementById('quantidade').value);
+      const responsavel = document.getElementById('responsavel').value.trim();
+      const data = firebase.firestore.Timestamp.now();
+      if (!produtoId || isNaN(quantidade) || quantidade <= 0 || !responsavel) return alert("Preencha os campos corretamente.");
+      try {
+        const ref = db.collection("produtos").doc(produtoId);
+        const doc = await ref.get();
+        if (!doc.exists) return alert("Produto não encontrado.");
+        const produto = doc.data();
+        if (tipo === "Saída" && produto.estoque < quantidade) return alert("Estoque insuficiente.");
+        const novoEstoque = tipo === "Entrada" ? produto.estoque + quantidade : produto.estoque - quantidade;
+        await ref.update({ estoque: novoEstoque });
+        await db.collection("movimentacoes").add({ data, produto: produto.nome, tipo, quantidade, responsavel, userId: user.uid });
+        alert("Movimentação registrada!");
+        document.getElementById('quantidade').value = '';
+        document.getElementById('responsavel').value = '';
+        atualizarEstoque();
+        atualizarHistorico();
+      } catch (e) {
+        alert("Erro: " + e.message);
+      }
+    }
+
+    async function atualizarProdutos() {
+      const select = document.getElementById('produtoSelect');
+      select.innerHTML = '';
+      const snapshot = await db.collection("produtos").get();
+      snapshot.forEach(doc => {
+        const option = document.createElement('option');
+        option.value = doc.id;
+        option.textContent = doc.data().nome;
+        select.appendChild(option);
+      });
+    }
+
+    let todosProdutos = [];
+
+    async function atualizarEstoque() {
+      const tbody = document.querySelector('#estoqueTable tbody');
+      tbody.innerHTML = '';
+      todosProdutos = [];
+      const snapshot = await db.collection("produtos").get();
+      snapshot.forEach(doc => {
+        const produto = doc.data();
+        produto.id = doc.id;
+        todosProdutos.push(produto);
+      });
+      filtrarEstoque();
+    }
+
+    function filtrarEstoque() {
+      const categoriaFiltro = document.getElementById('filtroCategoria').value.toLowerCase();
+      const nomeFiltro = document.getElementById('filtroNome').value.toLowerCase();
+      const tbody = document.querySelector('#estoqueTable tbody');
+      tbody.innerHTML = '';
+      todosProdutos.forEach(p => {
+        if (
+          p.categoria.toLowerCase().includes(categoriaFiltro) &&
+          p.nome.toLowerCase().includes(nomeFiltro)
+        ) {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${p.nome}</td>
+            <td>${p.categoria}</td>
+            <td style="color:${p.estoque <= p.minimo ? 'red' : 'black'}">${p.estoque}</td>
+            <td>${p.minimo}</td>
+            <td>
+              <button onclick="editarProduto('${p.id}')">Editar</button>
+              <button onclick="excluirProduto('${p.id}')">Excluir</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        }
+      });
+    }
+
+    async function editarProduto(id) {
+      try {
+        const doc = await db.collection("produtos").doc(id).get();
+        if (!doc.exists) return alert("Produto não encontrado.");
+        const produto = doc.data();
+        document.getElementById('nomeProduto').value = produto.nome;
+        document.getElementById('categoriaProduto').value = produto.categoria;
+        document.getElementById('estoqueMinimo').value = produto.minimo;
+        produtoEditandoId = id;
+        document.getElementById('btnSalvar').textContent = "Salvar Alterações";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (e) {
+        alert("Erro ao carregar produto para edição: " + e.message);
+      }
+    }
+
+    async function atualizarHistorico() {
+      const tbody = document.querySelector('#historicoTable tbody');
+      tbody.innerHTML = '';
+      const snapshot = await db.collection("movimentacoes").orderBy("data", "desc").get();
+      snapshot.forEach(doc => {
+        const m = doc.data();
+        const dataFormatada = m.data.toDate().toLocaleString('pt-BR');
+        tbody.innerHTML += `
+          <tr>
+            <td>${dataFormatada}</td>
+            <td>${m.produto}</td>
+            <td>${m.tipo}</td>
+            <td>${m.quantidade}</td>
+            <td>${m.responsavel}</td>
+          </tr>
+        `;
+      });
+    }
+
+    async function excluirProduto(id) {
+      if (!confirm("Deseja excluir este produto?")) return;
+      await db.collection("produtos").doc(id).delete();
+      alert("Produto excluído!");
+      atualizarProdutos();
+      atualizarEstoque();
+    }
+  </script>
+</body>
+</html>
+
+
+
