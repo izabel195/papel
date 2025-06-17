@@ -121,6 +121,9 @@
     <!-- MOVIMENTAÇÃO -->
     <div class="card">
       <h2>Movimentar Produto</h2>
+      <label for="filtroProdutoMov">Filtrar Produto:</label>
+<input type="text" id="filtroProdutoMov" placeholder="Pesquisar produto..." oninput="filtrarProdutosMovimentacao()" />
+
       <label for="produtoSelect">Produto:</label>
       <select id="produtoSelect"></select>
       <label for="tipoMov">Tipo:</label>
@@ -339,6 +342,34 @@
         select.appendChild(option);
       });
     }
+    let produtosMovimentacao = []; // Vai guardar todos os produtos para filtro
+
+async function atualizarProdutos() {
+  const select = document.getElementById('produtoSelect');
+  select.innerHTML = '';
+  produtosMovimentacao = [];
+  const snapshot = await db.collection("produtos").get();
+  snapshot.forEach(doc => {
+    const produto = { id: doc.id, nome: doc.data().nome };
+    produtosMovimentacao.push(produto);
+  });
+  filtrarProdutosMovimentacao();
+}
+
+function filtrarProdutosMovimentacao() {
+  const filtro = document.getElementById('filtroProdutoMov').value.toLowerCase();
+  const select = document.getElementById('produtoSelect');
+  select.innerHTML = '';
+  produtosMovimentacao.forEach(p => {
+    if (p.nome.toLowerCase().includes(filtro)) {
+      const option = document.createElement('option');
+      option.value = p.id;
+      option.textContent = p.nome;
+      select.appendChild(option);
+    }
+  });
+}
+
 
     let todosProdutos = [];
 
@@ -426,6 +457,10 @@
   </script>
 </body>
 </html>
+
+
+
+
 
 
 
