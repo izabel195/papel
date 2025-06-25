@@ -120,23 +120,40 @@
 
     <!-- MOVIMENTAÇÃO -->
     <div class="card">
-      <h2>Movimentar Produto</h2>
-      <label for="filtroProdutoMov">Filtrar Produto:</label>
-<input type="text" id="filtroProdutoMov" placeholder="Pesquisar produto..." oninput="filtrarProdutosMovimentacao()" />
+    <h2>Movimentar Produto</h2>
 
-      <label for="produtoSelect">Produto:</label>
-      <select id="produtoSelect"></select>
-      <label for="tipoMov">Tipo:</label>
-      <select id="tipoMov">
-        <option value="Entrada">Entrada</option>
-        <option value="Saída">Saída</option>
-      </select>
-      <label for="quantidade">Quantidade:</label>
-      <input type="number" id="quantidade" />
-      <label for="responsavel">Responsável:</label>
-      <input type="text" id="responsavel" />
-      <button onclick="registrarMovimentacao()">Registrar Movimentação</button>
+    <label for="produtoSelect">Produto:</label>
+    <select id="produtoSelect"></select>
+
+    <label for="tipoMov">Tipo:</label>
+    <select id="tipoMov">
+      <option value="Entrada">Entrada</option>
+      <option value="Saída">Saída</option>
+    </select>
+
+    <label for="quantidade">Quantidade:</label>
+    <input type="number" id="quantidade" />
+
+    <label for="responsavel">Responsável:</label>
+    <input type="text" id="responsavel" />
+
+    <label for="motivo">Motivo:</label>
+    <select id="motivo">
+      <option value="">Selecione um motivo</option>
+      <option value="Venda">Venda</option>
+      <option value="Perda">Perda</option>
+      <option value="Ajuste">Ajuste</option>
+      <option value="Transferência">Transferência</option>
+      <option value="Outro">Outro</option>
+    </select>
+
+    <div id="campoVenda">
+      <label for="numeroVenda">Número da Venda:</label>
+      <input type="text" id="numeroVenda" placeholder="Ex: #1023" />
     </div>
+
+    <button onclick="registrarMovimentacao()">Registrar Movimentação</button>
+  </div>
 
     <!-- ESTOQUE -->
     <div class="card">
@@ -304,30 +321,83 @@
       atualizarEstoque();
     }
 
+
+    document.getElementById("motivo").addEventListener("change", function () {
+      const campoVenda = document.getElementById("campoVenda");
+      campoVenda.style.display = this.value === "Venda" ? "block" : "none";
+    });
+
+    auth.onAuthStateChanged(async user => {
+      if (user) {
+        const produtoSelect = document.getElementById('produtoSelect');
+        produtoSelect.innerHTML = '';
+        const snapshot = await db.collection("produtos").get();
+        snapshot.forEach(doc => {
+          const option = document.createElement('option');
+          option.value = doc.id;
+          option.textContent = doc.data().nome;
+          produtoSelect.appendChild(option);
+        });
+      } else {
+        alert("Faça login para continuar.");
+      }
+    });
+
     async function registrarMovimentacao() {
       const user = auth.currentUser;
       const produtoId = document.getElementById('produtoSelect').value;
       const tipo = document.getElementById('tipoMov').value;
       const quantidade = parseInt(document.getElementById('quantidade').value);
       const responsavel = document.getElementById('responsavel').value.trim();
+      const motivo = document.getElementById('motivo').value.trim();
+      const numeroVenda = document.getElementById('numeroVenda').value.trim();
       const data = firebase.firestore.Timestamp.now();
-      if (!produtoId || isNaN(quantidade) || quantidade <= 0 || !responsavel) return alert("Preencha os campos corretamente.");
+
+      if (!produtoId || isNaN(quantidade) || quantidade <= 0 || !responsavel) {
+        return alert("Preencha todos os campos obrigatórios.");
+      }
+
+      if (motivo === "Venda" && !numeroVenda) {
+        return alert("Informe o número da venda.");
+      }
+
       try {
         const ref = db.collection("produtos").doc(produtoId);
         const doc = await ref.get();
         if (!doc.exists) return alert("Produto não encontrado.");
+
         const produto = doc.data();
-        if (tipo === "Saída" && produto.estoque < quantidade) return alert("Estoque insuficiente.");
-        const novoEstoque = tipo === "Entrada" ? produto.estoque + quantidade : produto.estoque - quantidade;
+
+        if (tipo === "Saída" && produto.estoque < quantidade) {
+          return alert("Estoque insuficiente.");
+        }
+
+        const novoEstoque = tipo === "Entrada"
+          ? produto.estoque + quantidade
+          : produto.estoque - quantidade;
+
         await ref.update({ estoque: novoEstoque });
-        await db.collection("movimentacoes").add({ data, produto: produto.nome, tipo, quantidade, responsavel, userId: user.uid });
-        alert("Movimentação registrada!");
+
+        await db.collection("movimentacoes").add({
+          data,
+          produto: produto.nome,
+          tipo,
+          quantidade,
+          responsavel,
+          motivo,
+          numeroVenda: motivo === "Venda" ? numeroVenda : null,
+          userId: user.uid
+        });
+
+        alert("Movimentação registrada com sucesso!");
         document.getElementById('quantidade').value = '';
         document.getElementById('responsavel').value = '';
-        atualizarEstoque();
-        atualizarHistorico();
+        document.getElementById('motivo').value = '';
+        document.getElementById('numeroVenda').value = '';
+        document.getElementById('campoVenda').style.display = 'none';
+
       } catch (e) {
-        alert("Erro: " + e.message);
+        alert("Erro ao registrar movimentação: " + e.message);
       }
     }
 
@@ -429,31 +499,31 @@ function filtrarProdutosMovimentacao() {
     }
 
     async function atualizarHistorico() {
-      const tbody = document.querySelector('#historicoTable tbody');
-      tbody.innerHTML = '';
-      const snapshot = await db.collection("movimentacoes").orderBy("data", "desc").get();
-      snapshot.forEach(doc => {
-        const m = doc.data();
-        const dataFormatada = m.data.toDate().toLocaleString('pt-BR');
-        tbody.innerHTML += `
-          <tr>
-            <td>${dataFormatada}</td>
-            <td>${m.produto}</td>
-            <td>${m.tipo}</td>
-            <td>${m.quantidade}</td>
-            <td>${m.responsavel}</td>
-          </tr>
-        `;
-      });
-    }
+  const tbody = document.querySelector('#historicoTable tbody');
+  tbody.innerHTML = '';
+  const snapshot = await db.collection("movimentacoes").orderBy("data", "desc").get();
 
-    async function excluirProduto(id) {
-      if (!confirm("Deseja excluir este produto?")) return;
-      await db.collection("produtos").doc(id).delete();
-      alert("Produto excluído!");
-      atualizarProdutos();
-      atualizarEstoque();
-    }
+  snapshot.forEach(doc => {
+    const m = doc.data();
+    const dataFormatada = m.data.toDate().toLocaleString('pt-BR');
+
+    const isVenda = m.tipo === "Saída" && m.motivo?.toLowerCase() === "venda";
+    const estiloLinha = isVenda ? 'style="background-color: #ffe6e6; font-weight: bold;"' : '';
+    const motivoText = m.motivo ? ` (${m.motivo})` : '';
+    const vendaInfo = isVenda && m.numeroVenda ? ` - Nº ${m.numeroVenda}` : '';
+
+    tbody.innerHTML += `
+      <tr ${estiloLinha}>
+        <td>${dataFormatada}</td>
+        <td>${m.produto}</td>
+        <td>${m.tipo}${motivoText}${vendaInfo}</td>
+        <td>${m.quantidade}</td>
+        <td>${m.responsavel}</td>
+      </tr>
+    `;
+  });
+}
+
   </script>
 </body>
 </html>
