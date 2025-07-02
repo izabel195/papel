@@ -162,7 +162,6 @@
 
   <button onclick="registrarMovimentacao()">Registrar Movimentação</button>
   
-</div>
 
 
     <!-- ESTOQUE -->
@@ -189,7 +188,16 @@
       <button onclick="imprimirTabelaFiltrada()">Imprimir Estoque Atual</button>
 
     </div>
-    
+    </div>
+<div style="margin-bottom: 10px;">
+  <label for="filtroImpressao">Mostrar:</label>
+  <select id="filtroImpressao">
+    <option value="todos">Todos</option>
+    <option value="zerados">Somente Zerados</option>
+    <option value="estoque">Somente com Estoque</option>
+  </select>
+  <button onclick="imprimirTabelaFiltrada()">Imprimir Estoque Atual</button>
+</div>
 
     <!-- HISTÓRICO -->
     <div class="card">
@@ -534,31 +542,36 @@ function filtrarProdutosMovimentacao() {
       filtrarEstoque();
     }
 
-    function filtrarEstoque() {
-      const categoriaFiltro = document.getElementById('filtroCategoria').value.toLowerCase();
-      const nomeFiltro = document.getElementById('filtroNome').value.toLowerCase();
-      const tbody = document.querySelector('#estoqueTable tbody');
-      tbody.innerHTML = '';
-      todosProdutos.forEach(p => {
-        if (
-          p.categoria.toLowerCase().includes(categoriaFiltro) &&
-          p.nome.toLowerCase().includes(nomeFiltro)
-        ) {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${p.nome}</td>
-            <td>${p.categoria}</td>
-            <td style="color:${p.estoque <= p.minimo ? 'red' : 'black'}">${p.estoque}</td>
-            <td>${p.minimo}</td>
-            <td>
-              <button onclick="editarProduto('${p.id}')">Editar</button>
-              <button onclick="excluirProduto('${p.id}')">Excluir</button>
-            </td>
-          `;
-          tbody.appendChild(row);
-        }
-      });
+ function filtrarEstoque() {
+  const categoriaFiltro = document.getElementById('filtroCategoria').value.toLowerCase();
+  const nomeFiltro = document.getElementById('filtroNome').value.toLowerCase();
+  const somenteZerados = document.getElementById('filtroZerados').checked;
+  const tbody = document.querySelector('#estoqueTable tbody');
+  tbody.innerHTML = '';
+
+  todosProdutos.forEach(p => {
+    const correspondeFiltro = 
+      p.categoria.toLowerCase().includes(categoriaFiltro) &&
+      p.nome.toLowerCase().includes(nomeFiltro);
+
+    const estoqueZerado = somenteZerados ? p.estoque <= 0 : true;
+
+    if (correspondeFiltro && estoqueZerado) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="checkbox" class="chk-impressao" value="${p.nome}"> ${p.nome}</td>
+        <td>${p.categoria}</td>
+        <td style="color:${p.estoque <= p.minimo ? 'red' : 'black'}">${p.estoque}</td>
+        <td>${p.minimo}</td>
+        <td>
+          <button onclick="editarProduto('${p.id}')">Editar</button>
+          <button onclick="excluirProduto('${p.id}')">Excluir</button>
+        </td>
+      `;
+      tbody.appendChild(row);
     }
+  });
+}
 
     async function editarProduto(id) {
       try {
@@ -613,31 +626,33 @@ async function excluirProduto(id) {
     alert("Erro ao excluir produto: " + e.message);
   }
 }
-function imprimirZerados() {
-  const zerados = todosProdutos.filter(p => p.estoque === 0);
-  gerarImpressao(zerados, "Produtos Zerados");
-}
+function imprimirTabelaFiltrada() {
+  const filtroTipo = document.getElementById("filtroImpressao").value;
 
-function imprimirDisponiveis() {
-  const disponiveis = todosProdutos.filter(p => p.estoque > 0);
-  gerarImpressao(disponiveis, "Produtos em Estoque");
-}
+  let produtosFiltrados = [];
 
-function gerarImpressao(produtos, titulo) {
+  if (filtroTipo === "todos") {
+    produtosFiltrados = todosProdutos;
+  } else if (filtroTipo === "zerados") {
+    produtosFiltrados = todosProdutos.filter(p => p.estoque === 0);
+  } else if (filtroTipo === "estoque") {
+    produtosFiltrados = todosProdutos.filter(p => p.estoque > 0);
+  }
+
   let html = `
     <html>
     <head>
-      <title>${titulo}</title>
+      <title>Estoque - ${filtroTipo.charAt(0).toUpperCase() + filtroTipo.slice(1)}</title>
       <style>
-        body { font-family: Arial; padding: 20px; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
         h2 { text-align: center; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
         th { background-color: #007BFF; color: white; }
       </style>
     </head>
     <body>
-      <h2>${titulo}</h2>
+      <h2>Estoque - ${filtroTipo.charAt(0).toUpperCase() + filtroTipo.slice(1)}</h2>
       <table>
         <thead>
           <tr>
@@ -650,7 +665,7 @@ function gerarImpressao(produtos, titulo) {
         <tbody>
   `;
 
-  produtos.forEach(p => {
+  produtosFiltrados.forEach(p => {
     html += `
       <tr>
         <td>${p.nome}</td>
@@ -675,81 +690,11 @@ function gerarImpressao(produtos, titulo) {
   novaJanela.print();
 }
 
-function filtrarEstoque() {
-  const categoriaFiltro = document.getElementById('filtroCategoria').value.toLowerCase();
-  const nomeFiltro = document.getElementById('filtroNome').value.toLowerCase();
-  const mostrarZerados = document.getElementById('filtroZerados').checked;
-
-  const tbody = document.querySelector('#estoqueTable tbody');
-  tbody.innerHTML = '';
-
-  todosProdutos.forEach(p => {
-    const correspondeCategoria = p.categoria.toLowerCase().includes(categoriaFiltro);
-    const correspondeNome = p.nome.toLowerCase().includes(nomeFiltro);
-    const estoqueZerado = mostrarZerados ? p.estoque === 0 : true;
-
-    if (correspondeCategoria && correspondeNome && estoqueZerado) {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${p.nome}</td>
-        <td>${p.categoria}</td>
-        <td style="color:${p.estoque <= p.minimo ? 'red' : 'black'}">${p.estoque}</td>
-        <td>${p.minimo}</td>
-        <td>
-          <button onclick="editarProduto('${p.id}')">Editar</button>
-          <button onclick="excluirProduto('${p.id}')">Excluir</button>
-        </td>
-      `;
-      tbody.appendChild(row);
-    }
-  });
-}
-function imprimirTabelaFiltrada() {
-  const tabela = document.getElementById('estoqueTable').outerHTML;
-  const estilo = `
-    <style>
-      table { width: 100%; border-collapse: collapse; font-family: Arial; }
-      th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-      th { background-color: #007BFF; color: white; }
-    </style>
-  `;
-  const janela = window.open('', '', 'width=800,height=600');
-  janela.document.write(`<html><head><title>Estoque Filtrado</title>${estilo}</head><body>`);
-  janela.document.write('<h2>Estoque Filtrado</h2>');
-  janela.document.write(tabela);
-  janela.document.write('</body></html>');
-  janela.document.close();
-  janela.print();
-}
-function imprimirTabelaFiltrada() {
-  // Clona a tabela atual
-  const tabelaOriginal = document.getElementById('estoqueTable');
-  const tabelaClone = tabelaOriginal.cloneNode(true);
-
-  // Remove a última coluna de cada linha (Ações)
-  tabelaClone.querySelectorAll('tr').forEach(row => {
-    row.deleteCell(-1);
-  });
-
-  const estilo = `
-    <style>
-      body { font-family: Arial, sans-serif; }
-      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-      th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-      th { background-color: #007BFF; color: white; }
-    </style>
-  `;
-
-  const janela = window.open('', '', 'width=800,height=600');
-  janela.document.write(`<html><head><title>Estoque Filtrado</title>${estilo}</head><body>`);
-  janela.document.write('<h2>Estoque Filtrado</h2>');
-  janela.document.write(tabelaClone.outerHTML);
-  janela.document.write('</body></html>');
-  janela.document.close();
-  janela.print();
-}
 
 
   </script>
 </body>
 </html>
+
+
+
