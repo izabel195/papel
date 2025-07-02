@@ -120,40 +120,50 @@
 
     <!-- MOVIMENTAÇÃO -->
     <div class="card">
-    <h2>Movimentar Produto</h2>
+  <h2>Movimentar Produto</h2>
+  <label for="filtroProdutoMov">Filtrar Produto:</label>
+<input type="text" id="filtroProdutoMov" placeholder="Digite o nome do produto..." oninput="filtrarProdutosMovimentacao()" />
 
-    <label for="produtoSelect">Produto:</label>
-    <select id="produtoSelect"></select>
 
-    <label for="tipoMov">Tipo:</label>
-    <select id="tipoMov">
-      <option value="Entrada">Entrada</option>
-      <option value="Saída">Saída</option>
-    </select>
+<button id="btnAjuste" onclick="ajustarEstoque()" style="display:none;">Ajustar Estoque Manual</button>
 
-    <label for="quantidade">Quantidade:</label>
-    <input type="number" id="quantidade" />
 
-    <label for="responsavel">Responsável:</label>
-    <input type="text" id="responsavel" />
+  <label for="produtoSelect">Produto:</label>
+  <select id="produtoSelect"></select>
 
-    <label for="motivo">Motivo:</label>
-    <select id="motivo">
-      <option value="">Selecione um motivo</option>
-      <option value="Venda">Venda</option>
-      <option value="Perda">Perda</option>
-      <option value="Ajuste">Ajuste</option>
-      <option value="Transferência">Transferência</option>
-      <option value="Outro">Outro</option>
-    </select>
+  <label for="tipoMov">Tipo:</label>
+  <select id="tipoMov">
+    <option value="Entrada">Entrada</option>
+    <option value="Saída">Saída</option>
+  </select>
 
-    <div id="campoVenda">
-      <label for="numeroVenda">Número da Venda:</label>
-      <input type="text" id="numeroVenda" placeholder="Ex: #1023" />
-    </div>
+  <label for="quantidade">Quantidade:</label>
+  <input type="number" id="quantidade" />
 
-    <button onclick="registrarMovimentacao()">Registrar Movimentação</button>
+  <label for="responsavel">Responsável:</label>
+  <input type="text" id="responsavel" />
+
+  <label for="motivo">Motivo:</label>
+  <select id="motivo" onchange="mostrarCamposVenda()">
+    <option value="">Selecione um motivo</option>
+    <option value="Venda">Venda</option>
+    <option value="Perda">Perda</option>
+    <option value="Ajuste">Ajuste</option>
+    <option value="Transferência">Transferência</option>
+    <option value="Outro">Outro</option>
+  </select>
+
+  <div id="campoVenda" style="display: none;">
+    <label for="numeroVenda">Número da Venda:</label>
+    <input type="text" id="numeroVenda" placeholder="Ex: #1023" />
+    <label for="nomeVenda">Nome da Venda:</label>
+    <input type="text" id="nomeVenda" placeholder="Ex: João Cliente" />
   </div>
+
+  <button onclick="registrarMovimentacao()">Registrar Movimentação</button>
+  
+</div>
+
 
     <!-- ESTOQUE -->
     <div class="card">
@@ -213,35 +223,101 @@
       messagingSenderId: "782676652165",
       appId: "1:782676652165:web:a3a0c633f4b29e55c279ec"
     };
+    
+     firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+  const appContent = document.getElementById('appContent');
+  const loginContainer = document.getElementById('loginContainer');
+  const body = document.body;
+  const logoutBtn = document.getElementById('logoutBtn');
+  const admins = ["uilianlopes286@gmail.com", "aeropipa7@gmail.com"];
 
-    const appContent = document.getElementById('appContent');
-    const loginContainer = document.getElementById('loginContainer');
-    const body = document.body;
-    const logoutBtn = document.getElementById('logoutBtn');
+  let produtoEditandoId = null;
 
-    // Variável para guardar o id do produto que está sendo editado
-    let produtoEditandoId = null;
 
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        body.style.display = 'block';
-        appContent.style.display = 'block';
-        loginContainer.style.display = 'none';
-        logoutBtn.style.display = 'inline-block';
-        atualizarProdutos();
-        atualizarEstoque();
-        atualizarHistorico();
-      } else {
-        body.style.display = 'block';
-        appContent.style.display = 'none';
-        loginContainer.style.display = 'block';
-        logoutBtn.style.display = 'none';
-      }
-    });
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      body.style.display = 'block';
+      appContent.style.display = 'block';
+      loginContainer.style.display = 'none';
+      logoutBtn.style.display = 'inline-block';
+
+      if (admins.includes(user.email)) {
+  document.getElementById('btnAjuste').style.display = 'inline-block';
+  window.isAdmin = true; // Define que o usuário é admin
+} else {
+  window.isAdmin = false;
+}
+
+
+      atualizarProdutos();
+      atualizarEstoque();
+      atualizarHistorico();
+    } else {
+      body.style.display = 'block';
+      appContent.style.display = 'none';
+      loginContainer.style.display = 'block';
+      logoutBtn.style.display = 'none';
+    }
+  });
+  
+
+   
+
+  
+  async function ajustarEstoque() {
+    const user = auth.currentUser;
+    if (!window.isAdmin) {
+      alert("Apenas administradores podem ajustar o estoque.");
+      return;
+    }
+
+    const produtoId = document.getElementById('produtoSelect').value;
+   let input = prompt("Digite a nova quantidade de estoque:");
+if (input === null) return; // cancelado
+const quantidade = parseInt(input);
+
+    const responsavel = document.getElementById('responsavel').value.trim();
+
+    if (!produtoId || isNaN(quantidade) || quantidade < 0 || !responsavel) {
+      alert("Dados inválidos para ajuste.");
+      return;
+    }
+  
+
+
+    try {
+      const ref = db.collection("produtos").doc(produtoId);
+      const doc = await ref.get();
+      if (!doc.exists) return alert("Produto não encontrado.");
+
+      const produto = doc.data();
+      await ref.update({ estoque: quantidade });
+
+      await db.collection("movimentacoes").add({
+        data: firebase.firestore.Timestamp.now(),
+        produto: produto.nome,
+        tipo: "Ajuste Manual",
+        quantidade,
+        responsavel,
+        motivo: "Ajuste Manual",
+        userId: user.uid
+      });
+
+      alert("Estoque ajustado com sucesso!");
+      atualizarEstoque();
+      atualizarHistorico();
+    } catch (e) {
+      alert("Erro ao ajustar estoque: " + e.message);
+    }
+  }
+
+
+
+  
 
     function login() {
       const email = document.getElementById('email').value.trim();
@@ -401,17 +477,7 @@
       }
     }
 
-    async function atualizarProdutos() {
-      const select = document.getElementById('produtoSelect');
-      select.innerHTML = '';
-      const snapshot = await db.collection("produtos").get();
-      snapshot.forEach(doc => {
-        const option = document.createElement('option');
-        option.value = doc.id;
-        option.textContent = doc.data().nome;
-        select.appendChild(option);
-      });
-    }
+    
     let produtosMovimentacao = []; // Vai guardar todos os produtos para filtro
 
 async function atualizarProdutos() {
@@ -523,14 +589,23 @@ function filtrarProdutosMovimentacao() {
     `;
   });
 }
+async function excluirProduto(id) {
+  if (!confirm("Tem certeza que deseja excluir este produto?")) return;
+
+  try {
+    await db.collection("produtos").doc(id).delete();
+    alert("Produto excluído com sucesso!");
+    atualizarProdutos();
+    atualizarEstoque();
+  } catch (e) {
+    alert("Erro ao excluir produto: " + e.message);
+  }
+}
+
 
   </script>
 </body>
 </html>
-
-
-
-
 
 
 
