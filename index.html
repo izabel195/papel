@@ -185,6 +185,7 @@
         <tbody></tbody>
       </table>
     </div>
+    
 
     <!-- HISTÓRICO -->
     <div class="card">
@@ -212,6 +213,11 @@
     <button onclick="login()">Entrar</button>
     <button onclick="registrar()">Registrar</button>
   </div>
+  <div style="text-align:center; margin-top: 20px;">
+  <button onclick="imprimirZerados()">Imprimir Zerados</button>
+  <button onclick="imprimirDisponiveis()">Imprimir em Estoque</button>
+</div>
+
 
   <!-- LÓGICA FIREBASE -->
   <script>
@@ -601,11 +607,70 @@ async function excluirProduto(id) {
     alert("Erro ao excluir produto: " + e.message);
   }
 }
+function imprimirZerados() {
+  const zerados = todosProdutos.filter(p => p.estoque === 0);
+  gerarImpressao(zerados, "Produtos Zerados");
+}
+
+function imprimirDisponiveis() {
+  const disponiveis = todosProdutos.filter(p => p.estoque > 0);
+  gerarImpressao(disponiveis, "Produtos em Estoque");
+}
+
+function gerarImpressao(produtos, titulo) {
+  let html = `
+    <html>
+    <head>
+      <title>${titulo}</title>
+      <style>
+        body { font-family: Arial; padding: 20px; }
+        h2 { text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+        th { background-color: #007BFF; color: white; }
+      </style>
+    </head>
+    <body>
+      <h2>${titulo}</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Categoria</th>
+            <th>Estoque</th>
+            <th>Mínimo</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  produtos.forEach(p => {
+    html += `
+      <tr>
+        <td>${p.nome}</td>
+        <td>${p.categoria}</td>
+        <td>${p.estoque}</td>
+        <td>${p.minimo}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const novaJanela = window.open("", "_blank");
+  novaJanela.document.write(html);
+  novaJanela.document.close();
+  novaJanela.focus();
+  novaJanela.print();
+}
+
 
 
   </script>
 </body>
 </html>
-
-
-
